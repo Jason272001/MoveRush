@@ -12,3 +12,5 @@ preview.png
 difficulty-preview.png
 split-screen-preview.png
 avatar-collection.png
+dist/
+.vercel/

@@ -65,7 +65,7 @@ Room games run on the server. Each remote device can control only its assigned p
 
 ## HTTPS and deployment
 
-**Worldwide play is not publicly deployed yet.** Physical phone cameras require a trusted HTTPS game address. Local HTTP supports displays and touch controls; `localhost` permits camera access only on the computer running the server.
+**The Vercel deployment serves the playable frontend. Online rooms and phone pairing are not deployed there yet.** Physical phone cameras require a trusted HTTPS game address. Local HTTP supports displays and touch controls; `localhost` permits camera access only on the computer running the server.
 
 For same-Wi-Fi devices, use the LAN address shown in the room panel instead of `localhost` on the phone. Reachability depends on existing firewall/router settings; this project does not change them.
 
@@ -96,3 +96,9 @@ Physical gesture comfort, varied lighting, real phone/TV browser compatibility, 
 - `server.cjs`: static serving, room lifecycle and server-side race simulation.
 
 MediaPipe reference: [Pose Landmarker for Web](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/web_js).
+
+### Vercel configuration
+
+Import this repository with Root Directory set to the repository root. The committed vercel.json explicitly selects Other (framework null), runs npm run build, and serves dist. The build also writes a static Build Output API manifest; server.cjs is not deployed as a Vercel Function. This fixes the FUNCTION_INVOCATION_FAILED error caused by invoking the persistent room server as a function. Solo, local split-screen races, camera tracking, avatar selection and clap readiness run in the browser. The Devices & rooms panel explicitly reports that network pairing needs a connected room server.
+
+For local development and full room-server tests, npm start continues to run the existing persistent Node server. Changing the Vercel root directory to a different subfolder overrides which project is imported; keep it at the repository root.

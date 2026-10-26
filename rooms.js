@@ -1,19 +1,20 @@
 /* Room pairing sends control commands and shared state, never camera frames. */
 window.MoveRushRooms=class {
   constructor(callbacks){
-    this.cb=callbacks;this.connected=false;this.role=null;this.busy=false;this.queue=Promise.resolve();this.addresses=[];this.pendingPose=null;this.pendingActions=[];this.sending=false;this.generation=0;
+    this.cb=callbacks;this.connected=false;this.role=null;this.busy=false;this.queue=Promise.resolve();this.addresses=[];this.pendingPose=null;this.pendingActions=[];this.sending=false;this.generation=0;this.roomsAvailable=null;
     const $=id=>document.getElementById(id);this.$=$;
     $('devices').onclick=()=>{$('roomPanel').hidden=false;};$('closeRooms').onclick=()=>{$('roomPanel').hidden=true;};
     $('createRoom').onclick=()=>this.create();$('joinRoom').onclick=()=>this.join();$('leaveRoom').onclick=()=>this.leave();$('controllerDisconnect').onclick=()=>this.leave();
     $('controllerCamera').onclick=()=>this.cb.camera();
     document.querySelectorAll('[data-phone-action]').forEach(button=>button.onpointerdown=e=>{e.preventDefault();this.cb.action(button.dataset.phoneAction);});
-    fetch('/api/config').then(r=>r.json()).then(data=>{this.addresses=data.lan||[];if(this.connected)this.showRoom();}).catch(()=>{});
+    this.configuration=fetch('/api/config').then(async r=>{if(!r.ok)throw Error('Room configuration unavailable');return r.json();}).then(data=>{this.addresses=data.lan||[];this.roomsAvailable=data.roomsAvailable!==false;this.unavailableMessage=data.message||'Online rooms are not available on this deployment. You can still play solo or race on this device.';this.updateAvailability();if(this.connected)this.showRoom();}).catch(()=>{this.roomsAvailable=false;this.unavailableMessage='Online room server is unavailable. Solo and same-device races still work.';this.updateAvailability();});
     const code=new URL(location.href).searchParams.get('room');if(code){$('joinCode').value=code.toUpperCase();$('roomPanel').hidden=false;}
-    try{const saved=JSON.parse(sessionStorage.getItem('moverush-room'));if(saved?.token&&saved?.code)this.restore(saved);}catch{}
+    try{const saved=JSON.parse(sessionStorage.getItem('moverush-room'));if(saved?.token&&saved?.code)this.configuration.then(()=>{if(this.roomsAvailable)this.restore(saved);else sessionStorage.removeItem('moverush-room');});}catch{}
     setInterval(()=>{if(this.role==='controller'&&this.connected){$('controllerCameraStatus').textContent=this.cb.status();$('controllerCamera').textContent=$('camera').textContent.includes('Disable')?'Disable phone camera':'Enable phone camera';}},400);
   }
+  updateAvailability(){this.$('createRoom').disabled=!this.roomsAvailable;this.$('joinRoom').disabled=!this.roomsAvailable;if(!this.roomsAvailable)this.message(this.unavailableMessage);}
   message(text){this.$('roomMessage').textContent=text;}
-  async request(path,data,auth=false){const headers={'Content-Type':'application/json'};if(auth)headers.Authorization='Bearer '+this.token;const response=await fetch(path,{method:'POST',headers,body:JSON.stringify(data??{})});const result=await response.json();if(!response.ok)throw Error(result.error||'Connection failed');return result;}
+  async request(path,data,auth=false){await this.configuration;if(!this.roomsAvailable)throw Error(this.unavailableMessage);const headers={'Content-Type':'application/json'};if(auth)headers.Authorization='Bearer '+this.token;const response=await fetch(path,{method:'POST',headers,body:JSON.stringify(data??{})});const result=await response.json().catch(()=>({error:'The room server did not respond correctly. Please try again later.'}));if(!response.ok)throw Error(result.error||'Connection failed');return result;}
   endpoint(action){return '/api/rooms/'+this.code+'/'+action;}
   async create(){if(this.busy)return;this.busy=true;try{this.message('Creating room…');const info=await this.request('/api/rooms',this.cb.getOptions());this.connect(info);this.message('Room ready. Pair your phones or another screen, then press Let’s run to open the movement check. Each player claps when ready.');}catch(e){this.message(e.message);}finally{this.busy=false;}}
   async join(){if(this.busy)return;this.busy=true;try{const code=this.$('joinCode').value.trim().toUpperCase();if(!/^[A-Z0-9]{6}$/.test(code))throw Error('Enter the six-character room code.');this.message('Joining…');const info=await this.request('/api/rooms/'+code+'/join',{role:this.$('joinRole').value,player:Number(this.$('joinPlayer').value)});this.connect(info);if(this.role==='controller')this.$('roomPanel').hidden=true;this.message('Connected. The main screen opens the movement check; each player claps when ready.');}catch(e){this.message(e.message);}finally{this.busy=false;}}
