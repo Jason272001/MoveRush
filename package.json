@@ -1,0 +1,18 @@
+{
+  "name": "moverush",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.cjs",
+    "check": "node --check core.js && node --check rooms.js && node --check game.js && node --check server.cjs && node --check motion.js && node --check avatars.js",
+    "test": "node avatars.test.cjs && node game.test.cjs && node motion.test.cjs && node server.test.cjs && node client.test.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "description": "A webcam-controlled runner with endless solo escapes and multiplayer races.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Jason272001/MoveRush.git"
+  }
+}

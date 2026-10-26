@@ -1,0 +1,43 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const {createServer,rooms,tick}=require('./server.cjs');
+const MoveRushAvatars=require('./avatars.js');const MoveRushCore=require('./core.js');const MoveRushMotion=require('./motion.js');
+const html=fs.readFileSync(__dirname+'/index.html','utf8');
+const roomSource=fs.readFileSync(__dirname+'/rooms.js','utf8'),gameSource=fs.readFileSync(__dirname+'/game.js','utf8');
+const errors=[],sources=[];
+function makeClient(base){
+ const elements=[],ids=new Map();
+ const context2d=new Proxy({}, {get:(target,key)=>key==='createLinearGradient'?()=>({addColorStop(){}}):typeof target[key]==='undefined'?()=>{}:target[key],set:(target,key,value)=>(target[key]=value,true)});
+ function element(tag,attrs){const dataset={};for(const m of attrs.matchAll(/data-([\w-]+)="([^"]*)"/g))dataset[m[1]]=m[2];const id=attrs.match(/\bid="([^"]*)"/)?.[1];const listeners={};const classes=new Set((attrs.match(/class="([^"]*)"/)?.[1]||'').split(' '));return {id,tagName:tag.toUpperCase(),dataset,hidden:/\bhidden\b/.test(attrs),disabled:false,style:{},textContent:'',value:attrs.match(/\bvalue="([^"]*)"/)?.[1]||'',classList:{add:c=>classes.add(c),remove:c=>classes.delete(c),toggle(c,on){on?classes.add(c):classes.delete(c);},contains:c=>classes.has(c)},appendChild(child){child.parentNode=this;return child;},addEventListener(type,fn){(listeners[type]??=[]).push(fn);},setAttribute(name,value){this[name]=value;},getContext:()=>context2d,click(){if(!this.disabled){this.onclick?.({target:this});for(const fn of listeners.click||[])fn({target:this});}}};}
+ for(const m of html.matchAll(/<(\w+)\b([^>]*)>/g)){const el=element(m[1],m[2]);elements.push(el);if(el.id)ids.set(el.id,el);}
+ function select(selector){return elements.filter(el=>selector.split(',').some(part=>{const attrs=[...part.matchAll(/\[data-([\w-]+)(?:="([^"]*)")?\]/g)];return attrs.length&&attrs.every(([,name,value])=>name in el.dataset&&(value===undefined||el.dataset[name]===value));}));}
+ const storage=new Map(),document={getElementById:id=>{assert.ok(ids.has(id),'Missing DOM id: '+id);return ids.get(id);},querySelectorAll:select,querySelector:selector=>selector.includes('span')?{textContent:''}:select(selector)[0]??null,body:element('body',''),addEventListener(){},activeElement:null};
+ const sandbox={console,document,MoveRushAvatars,MoveRushCore,MoveRushMotion,innerWidth:1280,innerHeight:800,devicePixelRatio:1,addEventListener(){},requestAnimationFrame(){},setInterval(){},performance:{now:()=>1000},isSecureContext:true,URL,location:new URL(base),sessionStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:(url,options)=>fetch(new URL(url,base),options)};
+ class Source{
+   constructor(url){this.handlers={};this.abort=new AbortController();this.closed=false;sources.push(this);this.read(url);}
+   addEventListener(name,fn){(this.handlers[name]??=[]).push(fn);}
+   async read(url){try{const res=await fetch(new URL(url,base),{signal:this.abort.signal});if(!res.ok)throw Error('SSE status '+res.status);const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='';while(!this.closed){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let end;while((end=buffer.indexOf('\n\n'))>=0){const chunk=buffer.slice(0,end);buffer=buffer.slice(end+2);const type=chunk.match(/^event: (\w+)/)?.[1],data=chunk.match(/\ndata: ([\s\S]*)/)?.[1];if(type)for(const fn of this.handlers[type]||[])fn({data});}}}catch(e){if(!this.closed){errors.push(e);this.onerror?.(e);}}}
+   close(){this.closed=true;this.abort.abort();}
+ }
+ sandbox.EventSource=Source;sandbox.window=sandbox;vm.createContext(sandbox);vm.runInContext(roomSource,sandbox);vm.runInContext(gameSource,sandbox);
+ return {run:code=>vm.runInContext(code,sandbox),document,el:id=>ids.get(id)};
+}
+async function wait(check){for(let i=0;i<150;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,10));}throw Error('Client state timed out');}
+(async()=>{const server=createServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base='http://127.0.0.1:'+server.address().port;
+ try{
+  const local=makeClient(base);assert.match(local.el('avatarHero').src,/^data:image\/svg/);local.document.querySelectorAll('[data-avatar]').find(b=>b.dataset.avatar==='3').click();assert.equal(local.run('profiles[0].id'),3);local.run("mode='race'");local.el('editPlayer').value='1';local.el('editPlayer').onchange();local.document.querySelectorAll('[data-avatar]').find(b=>b.dataset.avatar==='5').click();assert.equal(local.run('profiles[1].id'),5);assert.equal(local.run('profiles[0].id'),3);await local.run("configureCameraZoom({getVideoTracks:()=>[{getCapabilities:()=>({zoom:{min:1,max:3,step:.1}}),applyConstraints:async value=>{globalThis.appliedZoom=value.advanced[0].zoom;}}]})");assert.equal(local.run('appliedZoom'),1);assert.equal(local.el('zoomControl').hidden,false);await local.run("configureCameraZoom({getVideoTracks:()=>[{getCapabilities:()=>({})}]})");assert.equal(local.el('zoomControl').hidden,true);local.run("difficulty='normal';mode='race';start();frame(1000)");assert.equal(local.el('preflight').hidden,false);local.run("act('ready',0,'button');act('ready',1,'button');for(let i=0;i<62;i++)update(.05)");assert.equal(local.el('raceHud').hidden,false);local.run("act('left',0);act('right',1);update(.05);frame(1050)");assert.equal(local.run('players[0].lane'),-1);assert.equal(local.run('players[1].lane'),1);
+  local.run("mode='solo';start();act('ready',0,'button');for(let i=0;i<62;i++)update(.05);frame(1100)");assert.equal(local.el('hud').hidden,false);assert.match(local.el('paceBadge').textContent,/ENDLESS/);
+  const host=makeClient(base);host.run("mode='race';difficulty='easy'");await host.run('roomLink.create()');const code=host.run('roomLink.code');assert.equal(host.el('roomConnected').hidden,false);assert.match(host.el('roomCode').textContent,/^[A-Z0-9]{6}$/);
+  const phone1=makeClient(base),phone2=makeClient(base),screen2=makeClient(base);
+  for(const [client,role,player] of [[phone1,'controller',0],[phone2,'controller',1],[screen2,'screen',1]]){client.el('joinCode').value=code;client.el('joinRole').value=role;client.el('joinPlayer').value=String(player);await client.run('roomLink.join()');assert.equal(client.run('roomLink.connected'),true);}
+  assert.equal(phone1.el('controllerView').hidden,false);assert.equal(phone1.el('menu').hidden,true);assert.equal(screen2.el('start').disabled,true);assert.equal(host.el('start').disabled,false);
+  await host.run('roomLink.start()');await wait(()=>phone2.run("core.state.phase==='checking'"));assert.equal(phone1.el('preflight').hidden,false);phone1.run("act('ready',0,'button')");phone2.run("act('ready',1,'button')");await phone1.run('roomLink.queue');await phone2.run('roomLink.queue');for(let i=0;i<32;i++)tick(.1);await wait(()=>phone2.run('running'));tick(.05);await wait(()=>screen2.run('elapsed')>0);
+  phone1.run("roomLink.action('left')");phone2.run("roomLink.action('right')");await phone1.run('roomLink.queue');await phone2.run('roomLink.queue');tick(.05);
+  await wait(()=>host.run('players[0].lane')===-1&&host.run('players[1].lane')===1);
+  for(const client of [host,screen2,phone1,phone2]){assert.equal(client.run('players[0].lane'),-1);assert.equal(client.run('players[1].lane'),1);client.run('frame(1200)');}
+  assert.equal(host.el('raceHud').hidden,false);assert.equal(phone1.el('raceHud').hidden,true);assert.equal(phone1.el('touch').hidden,true);
+  await host.run('roomLink.pause()');await wait(()=>screen2.run('paused'));assert.equal(phone2.run('paused'),true);
+  await screen2.run('roomLink.leave()');await host.run('roomLink.leave()');await wait(()=>!phone1.run('roomLink.connected'));
+  assert.equal(host.el('menu').hidden,false);assert.equal(phone1.el('controllerView').hidden,true);assert.deepEqual(errors,[]);
+  console.log('Passed: actual game and room client scripts, local solo/race rendering, room lobby, two paired phones, remote screen, assigned controls, server state, pause and disconnect UI.');
+ }finally{for(const s of sources)s.close();for(const r of rooms.values())for(const c of r.clients.values())c.stream?.end();rooms.clear();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
+})().catch(e=>{console.error(e);process.exitCode=1;});
