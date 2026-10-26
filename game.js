@@ -68,8 +68,8 @@ $('recalibrate').onclick=resetCalibration;$('cameraClose').onclick=()=>stopCamer
 $('camera').onclick=async()=>{
  if(cameraLoading)return;if(camera){stopCamera('Camera off. Keyboard and touch are ready.');return;}
  if($('preflight').hidden&&!running)start();
- const cameraPolicy=document.permissionsPolicy||document.featurePolicy;if(cameraPolicy?.allowsFeature&&!cameraPolicy.allowsFeature('camera')){$('cameraPanel').hidden=false;$('cameraDiagnostics').textContent='This embedded browser blocks camera access. Open http://localhost:3000 directly in Chrome or Edge, then try again.';return;}
- if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia){$('cameraPanel').hidden=false;$('cameraDiagnostics').textContent='Camera API unavailable here. Open localhost:3000 directly in Chrome or Edge on this computer. Phone cameras require HTTPS.';$('cameraStatus').textContent=$('cameraDiagnostics').textContent;return;}
+ const cameraPolicy=document.permissionsPolicy||document.featurePolicy;if(cameraPolicy?.allowsFeature&&!cameraPolicy.allowsFeature('camera')){$('cameraPanel').hidden=false;$('cameraDiagnostics').textContent='This embedded browser blocks camera access. Open this website directly in Safari on iPhone or Chrome on Android, then try again.';return;}
+ if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia){$('cameraPanel').hidden=false;$('cameraDiagnostics').textContent='Camera API unavailable here. Open the HTTPS game website directly in Safari or Chrome. In-app browsers may block the camera.';$('cameraStatus').textContent=$('cameraDiagnostics').textContent;return;}
  const session=++cameraSession;cameraLoading=true;poseChecks=0;videoFrames=0;$('cameraDiagnostics').textContent='1 / 4 · Requesting camera permission';$('camera').disabled=true;$('cameraPanel').hidden=false;$('gestureStatus').textContent='Requesting camera access…';$('cameraStatus').textContent='Allow camera access. Near-camera mode only needs your face, shoulders, and hands visible.';
  try{
   // Ask for permission first so the user immediately knows whether this device has an available camera.
