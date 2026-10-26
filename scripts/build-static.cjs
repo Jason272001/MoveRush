@@ -3,10 +3,10 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const publicFiles = [
-  'index.html', 'style.css', 'avatars.js', 'core.js',
-  'motion.js', 'rooms.js', 'game.js',
+  'index.html', 'style.css', 'avatars.js', 'core.js', 'scenery.js',
+  'motion.js', 'peer-rooms.js', 'rooms.js', 'game.js', 'vendor/peerjs.min.js', 'vendor/peerjs-LICENSE.txt',
 ];
-const roomNotice = 'Online rooms and phone pairing need a connected room server. Solo, webcam play, and two-player races on this device are available.';
+const roomNotice = 'This deployment uses browser-hosted rooms. Create or join a room through the MoveRush website.';
 
 // Package a static frontend explicitly. The persistent Node room server is not
 // a request handler and must never become a Vercel Function entry point.
@@ -14,14 +14,16 @@ for (const directory of ['dist', '.vercel/output/static']) {
   const destination = path.join(root, directory);
   fs.mkdirSync(destination, {recursive: true});
   for (const file of publicFiles) {
+    fs.mkdirSync(path.dirname(path.join(destination,file)),{recursive:true});
     fs.copyFileSync(path.join(root, file), path.join(destination, file));
   }
   fs.writeFileSync(path.join(destination, 'deployment-config.json'), JSON.stringify({
-    roomsAvailable: false,
+    roomsAvailable: true,
+    transport: 'peerjs',
     hosting: 'static',
     lan: [],
     secure: true,
-    message: roomNotice,
+    message: 'Create a browser-hosted room. Keep the main game screen open while other devices join.',
   }, null, 2) + '\n');
   fs.writeFileSync(path.join(destination, 'rooms-unavailable.json'), JSON.stringify({error: roomNotice}) + '\n');
 }

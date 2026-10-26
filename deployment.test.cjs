@@ -51,10 +51,10 @@ const server = http.createServer((req,res) => {
       assert.ok(resource.headers.get('content-type').includes(match[1].endsWith('.js') ? 'javascript' : 'css'));
     }
     const deployment = await (await fetch(origin + '/api/config')).json();
-    assert.equal(deployment.roomsAvailable, false);
+    assert.equal(deployment.roomsAvailable, true);assert.equal(deployment.transport,'peerjs');const library=await fetch(origin+'/vendor/peerjs.min.js');assert.equal(library.status,200);
     const unavailable = await fetch(origin + '/api/rooms/ABC234/join');
     assert.equal(unavailable.status, 503);
-    assert.match((await unavailable.json()).error, /room server/);
+    assert.match((await unavailable.json()).error, /browser-hosted/);
     assert.equal((await fetch(origin + '/server.cjs')).status, 404);
     console.log('Passed: static build, Vercel routing, root page, every browser asset, deployment capabilities, explicit room-server status and server-source exclusion.');
   } finally {

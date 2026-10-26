@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "start": "node server.cjs",
-    "check": "node --check core.js && node --check rooms.js && node --check game.js && node --check server.cjs && node --check motion.js && node --check avatars.js && node --check scripts/build-static.cjs",
-    "test": "node avatars.test.cjs && node game.test.cjs && node motion.test.cjs && node server.test.cjs && node client.test.cjs && node deployment.test.cjs",
+    "check": "node --check core.js && node --check rooms.js && node --check game.js && node --check server.cjs && node --check motion.js && node --check avatars.js && node --check scripts/build-static.cjs && node --check peer-rooms.js && node --check scenery.js",
+    "test": "node scenery.test.cjs && node peer-rooms.test.cjs && node avatars.test.cjs && node game.test.cjs && node motion.test.cjs && node server.test.cjs && node client.test.cjs && node deployment.test.cjs",
     "build": "node scripts/build-static.cjs"
   },
   "engines": {

@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const {createServer,rooms,tick}=require('./server.cjs');
-const MoveRushAvatars=require('./avatars.js');const MoveRushCore=require('./core.js');const MoveRushMotion=require('./motion.js');
+const {createServer,rooms,tick}=require('./server.cjs');const {PeerRoom}=require('./peer-rooms.js');const {Peer}=require('./peer-rooms.test.cjs');
+const MoveRushScenery=require('./scenery.js');const MoveRushAvatars=require('./avatars.js');const MoveRushCore=require('./core.js');const MoveRushMotion=require('./motion.js');
 const html=fs.readFileSync(__dirname+'/index.html','utf8');
 const roomSource=fs.readFileSync(__dirname+'/rooms.js','utf8'),gameSource=fs.readFileSync(__dirname+'/game.js','utf8');
 const errors=[],sources=[];
@@ -11,14 +11,14 @@ function makeClient(base,staticHosting=false){
  for(const m of html.matchAll(/<(\w+)\b([^>]*)>/g)){const el=element(m[1],m[2]);elements.push(el);if(el.id)ids.set(el.id,el);}
  function select(selector){return elements.filter(el=>selector.split(',').some(part=>{const attrs=[...part.matchAll(/\[data-([\w-]+)(?:="([^"]*)")?\]/g)];return attrs.length&&attrs.every(([,name,value])=>name in el.dataset&&(value===undefined||el.dataset[name]===value));}));}
  const storage=new Map(),document={getElementById:id=>{assert.ok(ids.has(id),'Missing DOM id: '+id);return ids.get(id);},querySelectorAll:select,querySelector:selector=>selector.includes('span')?{textContent:''}:select(selector)[0]??null,body:element('body',''),addEventListener(){},activeElement:null};
- const sandbox={console,document,MoveRushAvatars,MoveRushCore,MoveRushMotion,innerWidth:1280,innerHeight:800,devicePixelRatio:1,addEventListener(){},requestAnimationFrame(){},setInterval(){},performance:{now:()=>1000},isSecureContext:true,URL,location:new URL(base),sessionStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:(url,options)=>staticHosting&&new URL(url,base).pathname==='/api/config'?Promise.resolve({ok:true,json:async()=>({roomsAvailable:false,message:'Online rooms need a connected room server. Local play is available.'})}):fetch(new URL(url,base),options)};
+ const sandbox={console,document,MoveRushScenery,MoveRushAvatars,MoveRushCore,MoveRushMotion,innerWidth:1280,innerHeight:800,devicePixelRatio:1,addEventListener(){},requestAnimationFrame(){},setInterval(){},clearInterval,performance:{now:()=>1000},isSecureContext:true,URL,location:new URL(base),sessionStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:(url,options)=>staticHosting&&new URL(url,base).pathname==='/api/config'?Promise.resolve({ok:true,json:async()=>({roomsAvailable:staticHosting==='peerjs',transport:staticHosting==='peerjs'?'peerjs':undefined,message:'Online rooms need a connected room server. Local play is available.'})}):fetch(new URL(url,base),options)};
  class Source{
    constructor(url){this.handlers={};this.abort=new AbortController();this.closed=false;sources.push(this);this.read(url);}
    addEventListener(name,fn){(this.handlers[name]??=[]).push(fn);}
    async read(url){try{const res=await fetch(new URL(url,base),{signal:this.abort.signal});if(!res.ok)throw Error('SSE status '+res.status);const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='';while(!this.closed){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let end;while((end=buffer.indexOf('\n\n'))>=0){const chunk=buffer.slice(0,end);buffer=buffer.slice(end+2);const type=chunk.match(/^event: (\w+)/)?.[1],data=chunk.match(/\ndata: ([\s\S]*)/)?.[1];if(type)for(const fn of this.handlers[type]||[])fn({data});}}}catch(e){if(!this.closed){errors.push(e);this.onerror?.(e);}}}
    close(){this.closed=true;this.abort.abort();}
  }
- sandbox.EventSource=Source;sandbox.window=sandbox;vm.createContext(sandbox);vm.runInContext(roomSource,sandbox);vm.runInContext(gameSource,sandbox);
+ sandbox.MoveRushPeerRoom=class extends PeerRoom{constructor(options){super({...options,Peer,Game:MoveRushCore.Game});}};sandbox.EventSource=Source;sandbox.window=sandbox;vm.createContext(sandbox);vm.runInContext(roomSource,sandbox);vm.runInContext(gameSource,sandbox);
  return {run:code=>vm.runInContext(code,sandbox),document,el:id=>ids.get(id)};
 }
 async function wait(check){for(let i=0;i<150;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,10));}throw Error('Client state timed out');}
@@ -37,7 +37,7 @@ async function wait(check){for(let i=0;i<150;i++){if(check())return;await new Pr
   assert.equal(host.el('raceHud').hidden,false);assert.equal(phone1.el('raceHud').hidden,true);assert.equal(phone1.el('touch').hidden,true);
   await host.run('roomLink.pause()');await wait(()=>screen2.run('paused'));assert.equal(phone2.run('paused'),true);
   await screen2.run('roomLink.leave()');await host.run('roomLink.leave()');await wait(()=>!phone1.run('roomLink.connected'));
-  assert.equal(host.el('menu').hidden,false);assert.equal(phone1.el('controllerView').hidden,true);assert.deepEqual(errors,[]);
+  assert.equal(host.el('menu').hidden,false);assert.equal(phone1.el('controllerView').hidden,true);assert.deepEqual(errors,[]);const browserHost=makeClient(base,'peerjs'),browserPhone=makeClient(base,'peerjs');browserHost.run("mode='race'");await browserHost.run('roomLink.create()');assert.equal(browserHost.run('roomLink.connected'),true);assert.equal(browserHost.el('createRoom').disabled,false);browserHost.run('clearInterval(roomLink.peerTransport.timer)');browserPhone.el('joinCode').value=browserHost.run('roomLink.code');browserPhone.el('joinRole').value='controller';browserPhone.el('joinPlayer').value='1';await browserPhone.run('roomLink.join()');await browserHost.run('roomLink.start()');await wait(()=>browserPhone.run("core.state.phase==='checking'"));browserPhone.run("act('right',0)");await browserPhone.run('roomLink.queue');await new Promise(resolve=>setImmediate(resolve));browserHost.run('roomLink.peerTransport.tick(.05)');await wait(()=>browserHost.run('players[1].lane')===1);assert.equal(browserHost.run('players[0].lane'),0);await browserHost.run('roomLink.leave()');await wait(()=>!browserPhone.run('roomLink.connected'));assert.deepEqual(errors,[]);
   console.log('Passed: actual game and room client scripts, local solo/race rendering, room lobby, two paired phones, remote screen, assigned controls, server state, pause and disconnect UI.');
  }finally{for(const s of sources)s.close();for(const r of rooms.values())for(const c of r.clients.values())c.stream?.end();rooms.clear();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

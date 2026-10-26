@@ -61,15 +61,15 @@ Supported layouts include:
 - Shared TV: one split-screen display + two phone controllers.
 - Separate locations: two displays and optionally a phone controller for each player, all connected to the same hosted server.
 
-Room games run on the server. Each remote device can control only its assigned player. A device disconnect pauses the room; reconnect and resume from the main screen. Rooms are temporary and are removed when the main screen leaves or the server restarts. Anyone with a room code can join an available device/player slot. There are no accounts or public room listings.
+On the Vercel website, rooms run in the main browser and synchronize over WebRTC data channels using PeerJS signaling. The main screen must stay open; backgrounding it pauses the match. Refreshing or closing the main screen ends its room. Each remote device can control only its assigned player. A device disconnect pauses the room; reconnect and resume from the main screen. Browser-hosted rooms are temporary and end when the main screen leaves. The separate Node room server remains available for local development. Anyone with a room code can join an available device/player slot. There are no accounts or public room listings.
 
 ## HTTPS and deployment
 
-**The Vercel deployment serves the playable frontend. Online rooms and phone pairing are not deployed there yet.** Physical phone cameras require a trusted HTTPS game address. Local HTTP supports displays and touch controls; `localhost` permits camera access only on the computer running the server.
+**The Vercel deployment supports browser-hosted room codes and phone pairing.** Physical phone cameras require a trusted HTTPS game address. Local HTTP supports displays and touch controls; `localhost` permits camera access only on the computer running the server.
 
 For same-Wi-Fi devices, use the LAN address shown in the room panel instead of `localhost` on the phone. Reachability depends on existing firewall/router settings; this project does not change them.
 
-For worldwide play, deploy the included Node server on a host with HTTPS and streaming HTTP support. Static-only hosting, including GitHub Pages by itself, cannot run the room server. A Dockerfile is included. Configure `PORT` and optionally `HOST`. A reverse proxy can terminate HTTPS; disable buffering for `/api/rooms/*/events`. Alternatively, set `TLS_CERT` and `TLS_KEY` to existing trusted certificate/key paths. Do not commit certificates, private keys or environment secrets.
+The deployed browser-room mode uses the public PeerJS signaling service and the library’s default STUN/TURN configuration. Some restricted networks may block connections; try another network if pairing times out. For an independently hosted authoritative server, deploy the included Node server on a host with HTTPS and streaming HTTP support. Static-only hosting, including GitHub Pages by itself, cannot run the room server. A Dockerfile is included. Configure `PORT` and optionally `HOST`. A reverse proxy can terminate HTTPS; disable buffering for `/api/rooms/*/events`. Alternatively, set `TLS_CERT` and `TLS_KEY` to existing trusted certificate/key paths. Do not commit certificates, private keys or environment secrets.
 
 ## Characters
 
@@ -99,6 +99,14 @@ MediaPipe reference: [Pose Landmarker for Web](https://developers.google.com/edg
 
 ### Vercel configuration
 
-Import this repository with Root Directory set to the repository root. The committed vercel.json explicitly selects Other (framework null), runs npm run build, and serves dist. The build also writes a static Build Output API manifest; server.cjs is not deployed as a Vercel Function. This fixes the FUNCTION_INVOCATION_FAILED error caused by invoking the persistent room server as a function. Solo, local split-screen races, camera tracking, avatar selection and clap readiness run in the browser. The Devices & rooms panel explicitly reports that network pairing needs a connected room server.
+Import this repository with Root Directory set to the repository root. The committed vercel.json explicitly selects Other (framework null), runs npm run build, and serves dist. The build also writes a static Build Output API manifest; server.cjs is not deployed as a Vercel Function. This fixes the FUNCTION_INVOCATION_FAILED error caused by invoking the persistent room server as a function. Solo, local split-screen races, camera tracking, avatar selection and clap readiness run in the browser. The Devices & rooms panel enables room creation using a browser-hosted PeerJS transport; no Vercel room function is invoked.
 
 For local development and full room-server tests, npm start continues to run the existing persistent Node server. Changing the Vercel root directory to a different subfolder overrides which project is imported; keep it at the repository root.
+
+## Browser-hosted rooms and scenery update
+
+Create room generates a six-character code after the signaling service registers the main screen. Other devices join the same website and choose their role/player. A second controller cannot claim an occupied player slot. Both participants can calibrate and clap ready; the main screen runs the shared countdown and simulation. Leaving or refreshing the main screen ends the room. Camera frames are never transmitted. On mobile controllers, keep the browser tab visible.
+
+PeerJS 1.5.5 is vendored under vendor/ with its MIT license. Runtime signaling uses the public PeerJS cloud; game data travels over WebRTC data channels with the SDK’s default relay configuration. Public service availability and restrictive network policies can affect pairing. Protocol tests use simulated reliable connections; the public signaling handshake has also been checked. Physical multi-device network testing is still needed.
+
+The course now moves through Emerald Valley, Waterfall Pass and Golden Canopy with blended palettes, layered hills, broadleaf trees, flowers, cloud layers, a distant waterfall and a winding river. The bridge has a continuous surface and clearer lane markings. Artwork is rendered locally without background image downloads.
