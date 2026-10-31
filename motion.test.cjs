@@ -6,7 +6,7 @@ assert.equal(feed(pose({x:.40})).lane,1,'Mirrored right lean');assert.equal(feed
 feed(pose());let jumps=0;for(let i=0;i<12;i++){time+=100;if(t.sample(pose({dy:-.12}),time).jump)jumps++;}assert.equal(jumps,1,'A jump triggers once while held');
 feed(pose());jumps=0;for(let i=0;i<12;i++){time+=100;if(t.sample(pose({dy:-.12}),time).jump)jumps++;}assert.equal(jumps,1,'Landing re-arms jump');
 feed(pose());assert.equal(feed(pose({dy:.12})).duck,true,'Crouch detected');feed(pose());assert.equal(result.duck,false);
-assert.equal(feed(pose({kneeDelta:.07})).hop,true,'Alternating knees maintain running');assert.equal(feed(pose(),15).hop,false,'Standing still stops hop signal');
+for(let i=0;i<12;i++)assert.equal(feed(pose({kneeDelta:i%2?.07:-.07}),1).hop,true,'Alternating knees maintain running');assert.equal(feed(pose({kneeDelta:.07}),15).hop,false,'Holding one knee up does not maintain running');assert.equal(feed(pose(),15).hop,false,'Standing still stops hop signal');
 assert.equal(t.sample(undefined,time+100).valid,false);t.reset();assert.equal(t.baseline,null);
 const partial=pose();partial[27].visibility=0;partial[28].visibility=0;assert.equal(t.sample(partial,time+200).valid,true,'Feet outside laptop view do not block calibration');
 console.log('Passed: timed calibration, mirrored steering, center reset, jump debounce/re-arm, crouch, stepping/standing, tracking loss, recalibration, laptop framing.');

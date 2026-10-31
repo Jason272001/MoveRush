@@ -24,6 +24,16 @@ Open **http://localhost:3000** on the computer running the server. Choose a mode
 
 Both racers receive the same obstacle sequence at the same course distances. The first finisher waits while the other runner finishes. Finish times decide the winner, including photo finishes.
 
+## Running Grand Prix (2–15 players)
+
+Open **/pack.html**, also linked from the character menu. Every player has their own full-screen course, runner name, avatar, and live standings. Host a room and copy its race invite. Each player enables their own camera or uses their private phone-camera link. Phone links control only that runner; share the race invite with friends instead.
+
+Stand still for calibration, test movement, then clap or press Ready. The host starts one shared three-second countdown after all connected runners are ready. Jogging/hopping is required: no automatic running or keyboard accelerator. Motion expires after a short detection allowance, then speed becomes exactly zero. A held knee does not count as continued jogging. Full-body framing supports knee motion; near-camera framing uses visible upper-body bounce. Tracking loss stops that runner. Steering, jump/slide, coins, bumps, and identical course patterns use the shared simulation.
+
+Host simulation sends only each player's course objects plus compact standings at 10 Hz. Up to 15 screens and one paired phone per runner use PeerJS data channels. Keep the host tab open and visible; hiding it pauses the race. Individual disconnects stop that runner without pausing everyone; refresh/rejoin the same code in the same tab to recover the saved runner token. Closing the host ends the room. A disconnected runner can be removed before the start. The approximately five-minute course ends after everyone finishes, with a 15-minute time limit and DNF for unfinished runners.
+
+Automated tests simulate 15 participants, filtered snapshots, readiness, strict motion, identical courses, capacity, pairing and reconnects. Real browser host/join has been checked. Physical 15-device sessions and cross-country latency still need field testing; signaling/TURN availability and host upload capacity affect reliability. Camera video is processed locally and is never streamed to other players.
+
 ## Controls
 
 | Action | Player 1 | Player 2 |

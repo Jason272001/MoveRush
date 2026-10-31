@@ -2,7 +2,7 @@
 (function(root){
  class MotionTracker {
   constructor(){this.reset();}
-  reset(){this.baseline=null;this.samples=[];this.smooth=null;this.lane=0;this.jumpLatch=false;this.lastJump=-Infinity;this.lastHop=-Infinity;this.previousHip=null;this.started=null;this.lastTime=null;this.handsOpenAt=-Infinity;this.clapLatched=false;this.lastClap=-Infinity;this.waveSamples=[];}
+  reset(){this.baseline=null;this.samples=[];this.smooth=null;this.lane=0;this.jumpLatch=false;this.lastJump=-Infinity;this.lastHop=-Infinity;this.previousHip=null;this.previousKnee=null;this.started=null;this.lastTime=null;this.handsOpenAt=-Infinity;this.clapLatched=false;this.lastClap=-Infinity;this.waveSamples=[];}
   sample(points,now,sensitivity=1,options={}){
    const upper=options.framing==='upper';if(this.framing!==undefined&&this.framing!==upper)this.reset();this.framing=upper;
    const required=upper?[11,12]:[11,12,23,24];
@@ -31,7 +31,8 @@
    if(jump){this.jumpLatch=true;this.lastJump=now;}if(rise<.07&&!bothHandsUp)this.jumpLatch=false;
    const hipMovement=Math.abs(v.hip-(this.previousHip??v.hip))/torso;
    const knees=!upper&&points[25]&&points[26]&&(points[25].visibility??0)>.5&&(points[26].visibility??0)>.5;
-   const stepping=knees&&Math.abs(points[25].y-points[26].y)/torso>.12;
+   const kneeOffset=knees?(points[25].y-points[26].y)/torso:0;
+   const stepping=knees&&this.previousKnee!==null&&Math.abs(kneeOffset-this.previousKnee)>.045;this.previousKnee=knees?kneeOffset:null;
    if((hipMovement>.018||stepping||jump)&&!duck)this.lastHop=now;
    this.previousHip=v.hip;
    const hop=now-this.lastHop<450;

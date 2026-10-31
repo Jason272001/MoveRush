@@ -50,6 +50,7 @@ const server = http.createServer((req,res) => {
       assert.equal(resource.status, 200, match[1]);
       assert.ok(resource.headers.get('content-type').includes(match[1].endsWith('.js') ? 'javascript' : 'css'));
     }
+    const packResponse=await fetch(origin+'/pack.html');assert.equal(packResponse.status,200);const packHtml=await packResponse.text();for(const m of packHtml.matchAll(/(?:src|href)="([^"?#]+\.(?:js|css))"/g))assert.equal((await fetch(origin+'/'+m[1])).status,200,m[1]);
     const deployment = await (await fetch(origin + '/api/config')).json();
     assert.equal(deployment.roomsAvailable, true);assert.equal(deployment.transport,'peerjs');const library=await fetch(origin+'/vendor/peerjs.min.js');assert.equal(library.status,200);
     const unavailable = await fetch(origin + '/api/rooms/ABC234/join');

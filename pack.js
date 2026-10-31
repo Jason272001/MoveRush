@@ -1,0 +1,73 @@
+/* Dedicated full-screen Grand Prix view; the original split-screen game is unchanged. */
+(()=>{
+ const $=id=>document.getElementById(id),canvas=$('course'),ctx=canvas.getContext('2d');
+ const params=new URL(location.href).searchParams,phone=params.has('controller');let room,state,player=0,detector,stream,loading=false,busy=false,lastVideo=-1,lastPose=0,session=0,previousCoins=0,audio;
+ const tracker=new MoveRushMotion.MotionTracker(),images=new Map();
+ const message=text=>$('message').textContent=text;
+ $('code').value=(params.get('race')||'').toUpperCase();if(phone){document.body.classList.add('phone');$('create').hidden=true;$('phoneReady').hidden=false;$('name').value='Phone camera';$('name').disabled=true;$('avatar').disabled=true;$('join').textContent='Connect my camera →';}
+ try{const saved=JSON.parse(sessionStorage.getItem('moverush-pack'));if(!phone&&saved?.name){$('name').value=saved.name;if(!$('code').value)$('code').value=saved.code;}}catch{}
+ const appearance=()=>MoveRushAvatars.normalize({id:Number($('avatar').value)});
+ function save(){if(room&&!phone)try{sessionStorage.setItem('moverush-pack',JSON.stringify({code:room.code,token:room.token,name:$('name').value}));}catch{}}
+ function roomOptions(){return {onState:receive,onStatus:message,onDisconnect:()=>{message('Connection lost. Your runner has stopped. Press Rejoin to reconnect.');$('join').textContent='Rejoin race →';$('setup').hidden=false;$('raceUI').hidden=true;}};}
+ async function connect(host){if(busy)return;busy=true;$('create').disabled=$('join').disabled=true;message(host?'Creating your race…':'Connecting to the race…');
+  try{if(room){room.close();room=null;}const code=$('code').value.trim().toUpperCase();if(!host&&!/^[A-Z2-9]{6}$/.test(code))throw Error('Enter the six-character race code.');if(!phone&&!$('name').value.trim())throw Error('Enter your runner name.');
+   room=new MoveRushPackRoom(roomOptions());if(host)await room.create({name:$('name').value,difficulty:$('difficulty').value,appearance:appearance()});else{let token=phone?params.get('controller'):undefined;try{const saved=JSON.parse(sessionStorage.getItem('moverush-pack'));if(!phone&&saved?.code===code)token=saved.token;}catch{}await room.join({code,name:$('name').value,role:phone?'controller':'screen',token,appearance:appearance()});}
+   player=room.player;save();$('setup').hidden=true;$('raceUI').hidden=false;$('cameraBox').hidden=false;$('leave').hidden=false;$('launch').hidden=!room.host;message(phone?'Camera connected to your runner. Enable camera below.':'Connected. Enable a camera here, or copy your private phone-camera link.');
+   if(state)receive(state);if(stream){tracker.reset();send('tracking',{active:true,valid:false,calibrated:false});}
+  }catch(e){room?.close();room=null;message(e.message);}finally{busy=false;$('create').disabled=$('join').disabled=false;}}
+ $('create').onclick=()=>connect(true);$('join').onclick=()=>connect(false);
+ $('leave').onclick=()=>{stopCamera();room?.close();room=null;state=null;try{sessionStorage.removeItem('moverush-pack');}catch{}$('setup').hidden=false;$('raceUI').hidden=true;$('cameraBox').hidden=true;$('leave').hidden=true;message('You left the race.');};
+ const send=(action,value)=>room&&!room.closed&&room.action(action,value);
+ $('ready').onclick=()=>{const p=state?.players[player];if(!p?.calibrated||!p?.verified){message('Enable your camera and jog or lean to test movement first.');return;}send('ready','button');};
+ $('phoneReady').onclick=()=>$('ready').click();
+ $('launch').onclick=()=>{try{room.launch();message('All runners start together. Keep jogging to move!');}catch(e){message(e.message);}};
+ async function copy(link,success){try{await navigator.clipboard.writeText(link);message(success);}catch{message('Open this link on the other device: '+link);}}
+ $('copy').onclick=()=>copy(location.origin+'/pack.html?race='+room.code,'Race invite copied. Friends enter their names and join on their own screens.');
+ $('phoneLink').onclick=()=>copy(location.origin+'/pack.html?race='+room.code+'&controller='+encodeURIComponent(room.token),'Your private camera link is copied. Open it on your phone, connect, then enable camera.');
+ function receive(next){state=next;if(room)player=room.player;const p=state.players[player];if(!p)return;
+  if(p.coins>previousCoins)chime();previousCoins=p.coins;
+  $('identity').textContent=p.name+' · '+state.players.filter(p=>!p.dnf).length+'/15 runners · '+(room?.code||'');$('roomCode').textContent=room?.code||'';
+  const checking=state.phase==='checking',counting=state.phase==='countdown';$('lobby').hidden=!checking&&!counting;
+  $('phase').textContent=state.paused?'Race paused · host is away':state.phase==='finished'?'Race complete':p.dnf?'You withdrew from this race':p.finished?'You crossed the line!':counting?'Starting in '+Math.ceil(state.countdown)+'…':checking?'Test your moves. Get ready.':'Race to the finish.';
+  $('progress').textContent=Math.floor(p.travel)+' / '+Math.ceil(state.finishDistance)+' m · '+p.coins+' gold · '+time(state.elapsed);
+  $('distanceBar').style.width=Math.min(100,p.travel/state.finishDistance*100)+'%';
+  $('effort').textContent=p.finished?(p.dnf?'Did not finish':'Finished in '+time(p.finishTime)):!p.calibrated?'Camera not tracking · runner stopped':p.speed>0?(p.slow>0?'Bump! Slowed briefly · keep jogging':'RUNNING · keep jogging or hopping'):'STOPPED · jog or hop to run';
+  $('ready').textContent=p.ready?'Ready ✓':'I’m ready';$('ready').disabled=p.ready||!p.calibrated||!p.verified;$('launch').disabled=!checking;$('phoneReady').disabled=p.ready||!p.calibrated||!p.verified;$('phoneReady').textContent=p.ready?'Ready ✓':'I’m ready';
+  const ordered=state.players.map((p,i)=>({p,i})).sort((a,b)=>a.p.dnf-b.p.dnf||(a.p.finished&&b.p.finished?(a.p.finishTime??Infinity)-(b.p.finishTime??Infinity):Number(b.p.finished)-Number(a.p.finished)||b.p.travel-a.p.travel));
+  $('ranking').replaceChildren();ordered.forEach(({p,i})=>{const li=document.createElement('li');li.className=i===player?'me':'';li.textContent=p.name+(i===player?' (you)':'')+' · '+(p.dnf?'DNF':!p.connected?'disconnected':p.finished?time(p.finishTime):checking?(p.ready?'Ready ✓':p.calibrated?'Tested · not ready':'Camera check'):Math.floor(p.travel)+' m')+' · '+p.coins+' gold';
+   if(room?.host&&checking&&!p.connected&&!p.dnf&&i!==0){const button=document.createElement('button');button.textContent='Remove';button.onclick=()=>room.remove(i);li.appendChild(button);}$('ranking').appendChild(li);});
+ }
+ function time(t){return Math.floor((t||0)/60)+':'+String(Math.floor((t||0)%60)).padStart(2,'0');}
+ function chime(){if(!audio)return;try{const o=audio.createOscillator(),g=audio.createGain();o.connect(g);g.connect(audio.destination);o.frequency.value=880;g.gain.setValueAtTime(.035,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.12);o.start();o.stop(audio.currentTime+.12);}catch{}}
+ function reset(){tracker.reset();send('tracking',{active:!!stream,calibrated:false,valid:false});$('tracking').textContent='Stand upright and still for 3 seconds.';$('calibration').value=0;}
+ $('recalibrate').onclick=reset;$('framing').onchange=reset;
+ function stopCamera(){session++;stream?.getTracks().forEach(t=>t.stop());stream=null;detector?.close();detector=null;$('video').srcObject=null;send('tracking',{active:false,calibrated:false,valid:false});$('camera').textContent='Enable camera';$('tracking').textContent='Camera off. Runner stopped.';}
+ function deadline(promise,ms,label){return new Promise((resolve,reject)=>{let expired=false;const timeout=setTimeout(()=>{expired=true;reject(Error(label+' timed out. Check your connection and retry.'));},ms);promise.then(value=>{clearTimeout(timeout);if(expired)value?.close?.();else resolve(value);},e=>{clearTimeout(timeout);reject(e);});});}
+ $('camera').onclick=async()=>{if(loading)return;if(stream){stopCamera();return;}if(!navigator.mediaDevices?.getUserMedia||!window.isSecureContext){message('Open the HTTPS game link directly in Safari or Chrome to use the camera.');return;}
+  const current=++session;loading=true;$('camera').disabled=true;
+  try{const Audio=window.AudioContext||window.webkitAudioContext;if(Audio){audio??=new Audio();audio.resume().catch(()=>{});} $('tracking').textContent='Allow camera access…';const input=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});if(current!==session){input.getTracks().forEach(t=>t.stop());return;}stream=input;$('video').srcObject=input;await $('video').play();$('tracking').textContent='Camera live. Loading body tracking…';
+   const {PoseLandmarker,FilesetResolver}=await deadline(import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/+esm'),25000,'Tracking download');const files=await deadline(FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm'),25000,'Tracking engine');
+   const model=await deadline(PoseLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task'},runningMode:'VIDEO',numPoses:1}),35000,'Body model');if(current!==session){model.close();return;}detector=model;lastVideo=-1;reset();$('camera').textContent='Turn camera off';
+  }catch(e){stopCamera();const known={NotAllowedError:'Camera denied. Allow camera access for this site, then retry.',NotReadableError:'Camera busy. Close other camera apps and retry.',NotFoundError:'No camera found. Use your private phone-camera link.'};message(known[e.name]||e.message);$('tracking').textContent='Camera setup failed. Your runner stays stopped.';}finally{loading=false;$('camera').disabled=false;}
+ };
+ function track(now){if(!detector||$('video').readyState<2||now-lastPose<100||lastVideo===$('video').currentTime)return;lastPose=now;lastVideo=$('video').currentTime;
+  try{const points=detector.detectForVideo($('video'),now).landmarks[0];const result=tracker.sample(points,now,1,{framing:$('framing').value});$('tracking').textContent=result.message;$('calibration').value=result.progress;
+   send('pose',{active:true,valid:result.valid,calibrated:!!result.ready,lane:result.ready&&result.valid?result.lane:undefined,hop:!!result.hop,jump:!!result.jump,duck:!!result.duck,wave:!!result.wave,clap:!!result.clap,gesture:result.message});
+   const c=$('skeleton').getContext('2d');$('skeleton').width=640;$('skeleton').height=480;if(points){c.strokeStyle='#c5f469';c.lineWidth=3;for(const [a,b] of [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[24,26],[25,27],[26,28]]){if((points[a]?.visibility??0)<.5||(points[b]?.visibility??0)<.5)continue;c.beginPath();c.moveTo(points[a].x*640,points[a].y*480);c.lineTo(points[b].x*640,points[b].y*480);c.stroke();}}
+  }catch(e){stopCamera();message('Tracking stopped: '+e.message);}
+ }
+ function picture(profile){const key=JSON.stringify(profile);if(!images.has(key)){const img=new Image();img.src=MoveRushAvatars.uri(profile,'runner');images.set(key,img);}return images.get(key);}
+ function render(now){const width=innerWidth,height=innerHeight,dpr=Math.min(devicePixelRatio||1,2);if(canvas.width!==Math.round(width*dpr)||canvas.height!==Math.round(height*dpr)){canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);
+  const local=state?.players[player],travel=local?.travel||0;MoveRushScenery.draw(ctx,{width,height,travel,time:now/1000,center:.5,laneWidth:.22});
+  const project=(lane,z)=>{const s=Math.max(.01,(1-z/150)**2);return {x:width*.5+lane*width*.22*s,y:height*.37+height*.56*s,s};};
+  if(state){for(const o of [...state.objects].sort((a,b)=>b.z-a.z)){if(o.owner!==player||o.collected||o.z<0||o.z>150)continue;const p=project(o.lane,o.z);ctx.fillStyle=o.type==='coin'?'#ffdc64':o.type==='rock'?'#657e74':'#b57648';if(o.type==='coin'){ctx.beginPath();ctx.ellipse(p.x,p.y-26*p.s,10*p.s,17*p.s,0,0,Math.PI*2);ctx.fill();}else if(o.type==='rock'){ctx.beginPath();ctx.moveTo(p.x-30*p.s,p.y);ctx.lineTo(p.x-20*p.s,p.y-45*p.s);ctx.lineTo(p.x+20*p.s,p.y-40*p.s);ctx.lineTo(p.x+32*p.s,p.y);ctx.fill();}else{ctx.fillRect(p.x-38*p.s,p.y-100*p.s,76*p.s,30*p.s);ctx.fillRect(p.x-38*p.s,p.y-100*p.s,7*p.s,100*p.s);ctx.fillRect(p.x+31*p.s,p.y-100*p.s,7*p.s,100*p.s);}}
+   const z=state.finishDistance-travel+6;if(z<150&&z>0){const a=project(-1.5,z),b=project(1.5,z),w=(b.x-a.x)/10;for(let row=0;row<2;row++)for(let i=0;i<10;i++){ctx.fillStyle=(row+i)%2?'#15382f':'#fff9df';ctx.fillRect(a.x+i*w,a.y-(120-row*15)*a.s,w+1,15*a.s);}ctx.fillStyle='#f9ffe9';ctx.fillRect(a.x,a.y-120*a.s,4*a.s,120*a.s);ctx.fillRect(b.x,a.y-120*a.s,4*a.s,120*a.s);}
+   // Visible competitors are ghosts: they share course distance, never block your lane.
+   const runners=state.players.map((p,i)=>({p,i,z:i===player?6:6+p.travel-travel})).filter(v=>!v.p.dnf&&v.z>0&&v.z<145).sort((a,b)=>b.z-a.z||(a.i===player?1:b.i===player?-1:0));
+   for(const {p,i,z} of runners){const point=project(p.x,z),scale=point.s*Math.min(width/750,1.35),profile=p.appearance,img=picture(profile),jump=p.jump>0?Math.sin((1-p.jump/MoveRushCore.LEVELS[state.difficulty].jump)*Math.PI)*height*.14*point.s:0;ctx.save();ctx.globalAlpha=i===player?1:.45;ctx.translate(point.x,point.y-jump);ctx.scale(scale,scale*(p.duck>0?.65:1));ctx.strokeStyle=profile.color;ctx.lineWidth=11;ctx.lineCap='round';const stride=Math.sin(p.animation*14)*15;ctx.beginPath();ctx.moveTo(-12,-40);ctx.lineTo(-12+stride,0);ctx.moveTo(12,-40);ctx.lineTo(12-stride,0);ctx.stroke();if(img.complete&&img.naturalWidth)ctx.drawImage(img,-55,-145,110,138);ctx.restore();if(i!==player){ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='12px Arial';ctx.fillText(p.name,point.x,point.y-160*scale-jump);}}
+  }
+  track(now);requestAnimationFrame(render);
+ }
+ document.addEventListener('visibilitychange',()=>{if(document.hidden){send('tracking',{active:false,valid:false,calibrated:false});if(room?.host){room.game.state.paused=true;message('Host screen was hidden. All runners paused. Return to this tab to resume.');}}else if(room?.host&&state){room.game.state.paused=false;tracker.reset();}});
+ window.addEventListener('pagehide',()=>{stopCamera();room?.close();});requestAnimationFrame(render);
+})();

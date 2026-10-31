@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 const {Game} = require('./core.js');
 const rooms = new Map();
 const TTL = 2 * 60 * 60 * 1000;
-const publicFiles = new Set(['index.html','style.css','game.js','core.js','rooms.js','motion.js','avatars.js','peer-rooms.js','scenery.js','vendor/peerjs.min.js','vendor/peerjs-LICENSE.txt']);
+const publicFiles = new Set(['pack.html','pack.css','pack.js','pack-room.js','index.html','style.css','game.js','core.js','rooms.js','motion.js','avatars.js','peer-rooms.js','scenery.js','vendor/peerjs.min.js','vendor/peerjs-LICENSE.txt']);
 const types = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'};
 function json(res,status,data){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));}
 function fail(status,message){const e=new Error(message);e.status=status;throw e;}

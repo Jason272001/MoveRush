@@ -3,7 +3,7 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const publicFiles = [
-  'index.html', 'style.css', 'avatars.js', 'core.js', 'scenery.js',
+  'pack.html','pack.css','pack.js','pack-room.js','index.html', 'style.css', 'avatars.js', 'core.js', 'scenery.js',
   'motion.js', 'peer-rooms.js', 'rooms.js', 'game.js', 'vendor/peerjs.min.js', 'vendor/peerjs-LICENSE.txt',
 ];
 const roomNotice = 'This deployment uses browser-hosted rooms. Create or join a room through the MoveRush website.';
