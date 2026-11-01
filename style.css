@@ -13,3 +13,5 @@
 #roomPrepare{display:block;width:100%;margin:16px 0}.controller-mode #cameraPanel{position:relative;right:auto;bottom:auto;width:min(440px,94%);max-width:94%;max-height:none;margin:120px auto 24px;z-index:5}.controller-mode:has(#cameraPanel:not([hidden])) #controllerView{position:relative;inset:auto;margin:24px auto;overflow:visible}.controller-mode #preflightPlayers{grid-template-columns:1fr}.controller-mode #preflight{inset:85px 2% 12px}.controller-mode #preflightCameraSlot #cameraPanel{margin:0;width:100%;max-width:100%}
 
 .grandPrixLink{display:block;margin:12px 0;padding:16px;border:1px solid #c5f46988;border-radius:14px;background:#28483ee8;color:#e9ffd3;text-decoration:none;font-size:16px;font-weight:bold}.grandPrixLink span{display:block;font-size:11px;font-weight:normal;margin-top:7px;color:#c3d6c3}
+
+#characters{grid-template-columns:repeat(5,minmax(0,1fr))}.wardrobe{flex-wrap:wrap}.wardrobe input[type=checkbox]{width:20px;height:20px}@media(max-width:600px){#characters{grid-template-columns:repeat(3,minmax(0,1fr))}}

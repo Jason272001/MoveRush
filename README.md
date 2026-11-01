@@ -120,3 +120,9 @@ Create room generates a six-character code after the signaling service registers
 PeerJS 1.5.5 is vendored under vendor/ with its MIT license. Runtime signaling uses the public PeerJS cloud; game data travels over WebRTC data channels with the SDK’s default relay configuration. Public service availability and restrictive network policies can affect pairing. Protocol tests use simulated reliable connections; the public signaling handshake has also been checked. Physical multi-device network testing is still needed.
 
 The course now moves through Emerald Valley, Waterfall Pass and Golden Canopy with blended palettes, layered hills, broadleaf trees, flowers, cloud layers, a distant waterfall and a winding river. The bridge has a continuous surface and clearer lane markings. Artwork is rendered locally without background image downloads.
+
+## Character studio and scenery
+
+Ten hand-drawn SVG runners include Nova, Ember, Orbit, Mika, Luna, Rafi, and stylized Pikachu, Mario, Batman and Superman fan characters. Grand Prix has a visual gallery with a large live preview; human runners support skin, four hair styles, hair/eye colors, glasses, outfit colors and accessories. All modes share sanitized appearance profiles, including online snapshots. Grand Prix remembers the last look on this browser. Artwork is drawn for this project; no official character assets are bundled.
+
+The shared Canvas landscape uses layered mountain ridges, atmospheric mist, shaded foliage, rocks, grass and world-anchored trail texture. It stays a lightweight illustrated 2.5D environment rather than photorealistic 3D.
